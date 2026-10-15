@@ -6,7 +6,10 @@ export interface ChatMessage {
   content: string;
 }
 
-export async function complete(messages: ChatMessage[], opts: { maxTokens?: number; temperature?: number } = {}) {
+export async function complete(
+  messages: ChatMessage[],
+  opts: { maxTokens?: number; temperature?: number } = {},
+) {
   const res = await openai.chat.completions.create({
     model: config.azureOpenAI.llmDeployment,
     messages,
@@ -16,7 +19,10 @@ export async function complete(messages: ChatMessage[], opts: { maxTokens?: numb
   return {
     text: res.choices[0]?.message?.content ?? "",
     usage: res.usage
-      ? { promptTokens: res.usage.prompt_tokens, completionTokens: res.usage.completion_tokens }
+      ? {
+          promptTokens: res.usage.prompt_tokens,
+          completionTokens: res.usage.completion_tokens,
+        }
       : undefined,
   };
 }

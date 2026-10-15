@@ -1,18 +1,21 @@
 type Level = "debug" | "info" | "warn" | "error";
 
-// Patterns that must never reach logs (tokens, keys, credentials in URLs).
 const SECRET_PATTERNS: RegExp[] = [
-  /gh[pousr]_[A-Za-z0-9]{20,}/g, // GitHub classic tokens
-  /github_pat_[A-Za-z0-9_]{20,}/g, // GitHub fine-grained tokens
+  /gh[pousr]_[A-Za-z0-9]{20,}/g,
+  /github_pat_[A-Za-z0-9_]{20,}/g,
   /(Authorization:\s*)(Basic|Bearer)\s+[A-Za-z0-9+/=._-]+/gi,
-  /(\/\/)[^/@\s:]+:[^/@\s]+@/g, // user:password@ in URLs
+  /(\/\/)[^/@\s:]+:[^/@\s]+@/g,
   /(api[-_]?key["'=:\s]+)[A-Za-z0-9._-]{8,}/gi,
 ];
 
 export function redact(text: string): string {
   let out = text;
   for (const re of SECRET_PATTERNS) {
-    out = out.replace(re, (_m, p1?: string) => (typeof p1 === "string" && p1.length < 40 ? `${p1}[REDACTED]` : "[REDACTED]"));
+    out = out.replace(re, (_m, p1?: string) =>
+      typeof p1 === "string" && p1.length < 40
+        ? `${p1}[REDACTED]`
+        : "[REDACTED]",
+    );
   }
   return out;
 }

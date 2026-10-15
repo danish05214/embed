@@ -18,7 +18,9 @@ function map(r: Record<string, unknown>): Source {
     error: (r.error as string) ?? null,
     fileCount: Number(r.file_count ?? 0),
     chunkCount: Number(r.chunk_count ?? 0),
-    lastIndexedAt: r.last_indexed_at ? new Date(r.last_indexed_at as string).toISOString() : null,
+    lastIndexedAt: r.last_indexed_at
+      ? new Date(r.last_indexed_at as string).toISOString()
+      : null,
     createdAt: new Date(r.created_at as string).toISOString(),
     updatedAt: new Date(r.updated_at as string).toISOString(),
   };
@@ -26,17 +28,28 @@ function map(r: Record<string, unknown>): Source {
 
 export const sourceRepository = {
   async findById(id: string, db: Queryable = pool): Promise<Source | null> {
-    const { rows } = await db.query(`select ${COLUMNS} from sources where id = $1`, [id]);
+    const { rows } = await db.query(
+      `select ${COLUMNS} from sources where id = $1`,
+      [id],
+    );
     return rows[0] ? map(rows[0]) : null;
   },
 
-  async findByKey(sourceKey: string, db: Queryable = pool): Promise<Source | null> {
-    const { rows } = await db.query(`select ${COLUMNS} from sources where source_key = $1`, [sourceKey]);
+  async findByKey(
+    sourceKey: string,
+    db: Queryable = pool,
+  ): Promise<Source | null> {
+    const { rows } = await db.query(
+      `select ${COLUMNS} from sources where source_key = $1`,
+      [sourceKey],
+    );
     return rows[0] ? map(rows[0]) : null;
   },
 
   async list(): Promise<Source[]> {
-    const { rows } = await pool.query(`select ${COLUMNS} from sources order by updated_at desc`);
+    const { rows } = await pool.query(
+      `select ${COLUMNS} from sources order by updated_at desc`,
+    );
     return rows.map(map);
   },
 
@@ -53,7 +66,13 @@ export const sourceRepository = {
        values ($1, $2, $3, $4, $5)
        on conflict (source_key) do nothing
        returning ${COLUMNS}`,
-      [input.sourceKey, input.type, input.name, input.repoUrl ?? null, input.branch ?? null],
+      [
+        input.sourceKey,
+        input.type,
+        input.name,
+        input.repoUrl ?? null,
+        input.branch ?? null,
+      ],
     );
     if (rows[0]) return { source: map(rows[0]), created: true };
     const existing = await this.findByKey(input.sourceKey);
@@ -61,8 +80,15 @@ export const sourceRepository = {
     return { source: existing, created: false };
   },
 
-  async setStatus(id: string, status: SourceStatus, error: string | null = null): Promise<void> {
-    await pool.query(`update sources set status = $2, error = $3 where id = $1`, [id, status, error]);
+  async setStatus(
+    id: string,
+    status: SourceStatus,
+    error: string | null = null,
+  ): Promise<void> {
+    await pool.query(
+      `update sources set status = $2, error = $3 where id = $1`,
+      [id, status, error],
+    );
   },
 
   async markIndexed(

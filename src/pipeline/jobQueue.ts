@@ -2,18 +2,15 @@ import { jobRepository, emptyProgress } from "../repository/jobRepository.js";
 import type { JobProgress } from "../types.js";
 import { logger } from "../utils/logger.js";
 
-export type JobHandler = (report: (p: Partial<JobProgress>) => Promise<void>) => Promise<void>;
+export type JobHandler = (
+  report: (p: Partial<JobProgress>) => Promise<void>,
+) => Promise<void>;
 
 interface QueuedJob {
   jobId: string;
   handler: JobHandler;
 }
 
-/**
- * Minimal in-process job queue (FIFO, limited concurrency).
- * Good for a single server instance. For multiple instances or guaranteed delivery,
- * replace with a durable queue (e.g. BullMQ + Redis, or Azure Service Bus).
- */
 class JobQueue {
   private queue: QueuedJob[] = [];
   private running = 0;
@@ -45,10 +42,11 @@ class JobQueue {
     let lastWrite = 0;
     const report = async (p: Partial<JobProgress>) => {
       Object.assign(progress, p);
-      // Throttle DB writes to about once per second
       if (Date.now() - lastWrite > 1000) {
         lastWrite = Date.now();
-        await jobRepository.updateProgress(jobId, progress).catch(() => undefined);
+        await jobRepository
+          .updateProgress(jobId, progress)
+          .catch(() => undefined);
       }
     };
 
@@ -61,7 +59,9 @@ class JobQueue {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error("Job failed", { jobId, error: message });
-      await jobRepository.finish(jobId, "failed", progress, message).catch(() => undefined);
+      await jobRepository
+        .finish(jobId, "failed", progress, message)
+        .catch(() => undefined);
     }
   }
 }

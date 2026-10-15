@@ -7,7 +7,10 @@ const MAX_TOKENS_PER_REQUEST = 200_000; // stay well below the API's per-request
 export const EMBEDDING_MODEL = config.azureOpenAI.embeddingDeployment;
 
 /** Embed many texts in batches. Returns vectors in the same order as `texts`. */
-export async function embedTexts(texts: string[], tokenCounts?: number[]): Promise<number[][]> {
+export async function embedTexts(
+  texts: string[],
+  tokenCounts?: number[],
+): Promise<number[][]> {
   const results: number[][] = new Array(texts.length);
   let batch: number[] = [];
   let batchTokens = 0;
@@ -35,7 +38,11 @@ export async function embedTexts(texts: string[], tokenCounts?: number[]): Promi
 
   for (let i = 0; i < texts.length; i++) {
     const t = tokenCounts?.[i] ?? Math.ceil(texts[i]!.length / 4);
-    if (batch.length >= MAX_INPUTS_PER_REQUEST || batchTokens + t > MAX_TOKENS_PER_REQUEST) await flush();
+    if (
+      batch.length >= MAX_INPUTS_PER_REQUEST ||
+      batchTokens + t > MAX_TOKENS_PER_REQUEST
+    )
+      await flush();
     batch.push(i);
     batchTokens += t;
   }

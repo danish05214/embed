@@ -7,8 +7,10 @@ export interface ChunkToStore extends ChunkDraft {
 }
 
 export const chunkRepository = {
-  /** Look up cached embeddings by text hash, so identical text is never embedded twice. */
-  async getCachedEmbeddings(embedHashes: string[], model: string): Promise<Map<string, number[]>> {
+  async getCachedEmbeddings(
+    embedHashes: string[],
+    model: string,
+  ): Promise<Map<string, number[]>> {
     const out = new Map<string, number[]>();
     if (embedHashes.length === 0) return out;
     const { rows } = await pool.query(
@@ -20,7 +22,11 @@ export const chunkRepository = {
     return out;
   },
 
-  async saveCache(db: Queryable, entries: { embedHash: string; embedding: number[] }[], model: string): Promise<void> {
+  async saveCache(
+    db: Queryable,
+    entries: { embedHash: string; embedding: number[] }[],
+    model: string,
+  ): Promise<void> {
     for (const e of entries) {
       await db.query(
         `insert into embedding_cache (embed_hash, model, embedding)
@@ -31,10 +37,6 @@ export const chunkRepository = {
     }
   },
 
-  /**
-   * Make the stored chunks of a document exactly equal to `chunks`:
-   * delete chunks that no longer exist, upsert the rest by stable ID.
-   */
   async replaceForDocument(
     db: Queryable,
     documentId: string,
@@ -43,7 +45,10 @@ export const chunkRepository = {
     model: string,
   ): Promise<void> {
     const ids = chunks.map((c) => c.id);
-    await db.query(`delete from chunks where document_id = $1 and not (id = any($2::text[]))`, [documentId, ids]);
+    await db.query(
+      `delete from chunks where document_id = $1 and not (id = any($2::text[]))`,
+      [documentId, ids],
+    );
 
     for (const c of chunks) {
       await db.query(

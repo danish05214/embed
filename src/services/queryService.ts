@@ -57,7 +57,8 @@ export async function answerQuestion(input: {
 
   if (hits.length === 0) {
     return {
-      answer: "I couldn't find anything relevant in the indexed sources. Try rephrasing, or check that the right repo/documents are indexed.",
+      answer:
+        "I couldn't find anything relevant in the indexed sources. Try rephrasing, or check that the right repo/documents are indexed.",
       sources: [],
     };
   }
@@ -80,7 +81,8 @@ export async function answerQuestion(input: {
       endLine: h.metadata.endLine,
       url: deepLink(h),
       score: Number(h.score.toFixed(4)),
-      snippet: h.content.length > 400 ? `${h.content.slice(0, 400)}…` : h.content,
+      snippet:
+        h.content.length > 400 ? `${h.content.slice(0, 400)}…` : h.content,
     })),
     usage,
   };

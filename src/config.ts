@@ -40,8 +40,9 @@ const EnvSchema = z.object({
 
 const parsed = EnvSchema.safeParse(process.env);
 if (!parsed.success) {
-  // Print only which variables are wrong -- never their values.
-  const problems = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
+  const problems = parsed.error.issues
+    .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+    .join("\n");
   console.error(`Invalid environment configuration:\n${problems}`);
   process.exit(1);
 }
@@ -79,12 +80,6 @@ export const config = {
     topK: env.QUERY_TOP_K,
   },
 
-  /**
-   * Chunking profiles per content type (sizes in tokens).
-   * Starting values based on common practice (Azure AI Search guidance: ~512 tokens, ~25% overlap
-   * for prose; code split by structure with no overlap). Tune against your own questions.
-   * Bump `version` whenever you change a profile so changed chunks are re-embedded.
-   */
   chunking: {
     version: 1,
     profiles: {

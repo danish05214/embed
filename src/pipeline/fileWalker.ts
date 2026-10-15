@@ -9,10 +9,6 @@ export interface WalkResult {
   skipped: { path: string; reason: string }[];
 }
 
-/**
- * Turn any user-supplied relative path into a safe POSIX path inside the source.
- * Removes drive letters, leading slashes and ".." segments.
- */
 export function sanitizeRelativePath(p: string): string {
   return p
     .replace(/\\/g, "/")
@@ -22,16 +18,25 @@ export function sanitizeRelativePath(p: string): string {
     .join("/");
 }
 
-/** Decide whether a file should be indexed. */
-export function filterFile(relPath: string, size: number): { ok: true } | { ok: false; reason: string } {
+export function filterFile(
+  relPath: string,
+  size: number,
+): { ok: true } | { ok: false; reason: string } {
   const ig = shouldIgnorePath(relPath);
   if (ig.ignore) return { ok: false, reason: ig.reason! };
-  if (!detectFileType(relPath)) return { ok: false, reason: "unsupported file type" };
+  if (!detectFileType(relPath))
+    return { ok: false, reason: "unsupported file type" };
   if (size === 0) return { ok: false, reason: "empty file" };
-  // Office/PDF files are binary and larger than their text; allow 10x the text limit.
   const t = detectFileType(relPath)!;
-  const limit = t.parser === "text" ? config.limits.maxFileBytes : config.limits.maxFileBytes * 10;
-  if (size > limit) return { ok: false, reason: `file too large (${Math.round(size / 1024)} KB)` };
+  const limit =
+    t.parser === "text"
+      ? config.limits.maxFileBytes
+      : config.limits.maxFileBytes * 10;
+  if (size > limit)
+    return {
+      ok: false,
+      reason: `file too large (${Math.round(size / 1024)} KB)`,
+    };
   return { ok: true };
 }
 

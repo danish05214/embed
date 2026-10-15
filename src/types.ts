@@ -44,32 +44,23 @@ export interface Job {
   finishedAt: string | null;
 }
 
-/** A file ready to be indexed (from a Git checkout or an upload). */
 export interface InputFile {
-  /** Relative path used for citations, e.g. "src/app.ts" or "docs/guide.pdf" */
   path: string;
-  /** Absolute path on local disk to read from */
   absPath: string;
   size: number;
 }
 
-/** Text extracted from a file, split into logical sections (pages, sheets, or the whole file). */
 export interface ParsedSection {
   text: string;
   kind: ContentKind;
-  /** e.g. code language for the splitter */
   language?: string;
-  /** e.g. "Page 3" or "Sheet: Claims" */
   label?: string;
-  /** Header line repeated in each table chunk */
   tableHeader?: string;
-  /** For tables: rows already split (header excluded) */
   rows?: string[];
 }
 
 export interface ChunkDraft {
   content: string;
-  /** Text actually sent to the embedding model (context header + content) */
   embedText: string;
   chunkHash: string;
   embedHash: string;

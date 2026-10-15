@@ -5,10 +5,6 @@ export function sha256(input: string | Buffer): string {
   return crypto.createHash("sha256").update(input).digest("hex");
 }
 
-/**
- * Normalise text before hashing so trivial differences (Windows vs Unix line endings,
- * trailing spaces, BOM) don't count as changes.
- */
 export function normalizeText(text: string): string {
   return text
     .replace(/^﻿/, "")
@@ -28,10 +24,10 @@ export function hashFile(absPath: string): Promise<string> {
   });
 }
 
-/**
- * Stable chunk ID: same document + same chunk text (+ occurrence, for duplicate text in one file)
- * always produces the same ID, so re-indexing upserts instead of duplicating.
- */
-export function stableChunkId(documentId: string, chunkHash: string, occurrence: number): string {
+export function stableChunkId(
+  documentId: string,
+  chunkHash: string,
+  occurrence: number,
+): string {
   return sha256(`${documentId}:${chunkHash}:${occurrence}`);
 }

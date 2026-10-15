@@ -57,14 +57,25 @@ export const jobRepository = {
   },
 
   async markRunning(id: string): Promise<void> {
-    await pool.query(`update jobs set status = 'running', started_at = now() where id = $1`, [id]);
+    await pool.query(
+      `update jobs set status = 'running', started_at = now() where id = $1`,
+      [id],
+    );
   },
 
   async updateProgress(id: string, progress: JobProgress): Promise<void> {
-    await pool.query(`update jobs set progress = $2 where id = $1`, [id, JSON.stringify(progress)]);
+    await pool.query(`update jobs set progress = $2 where id = $1`, [
+      id,
+      JSON.stringify(progress),
+    ]);
   },
 
-  async finish(id: string, status: "succeeded" | "failed", progress: JobProgress, error: string | null = null) {
+  async finish(
+    id: string,
+    status: "succeeded" | "failed",
+    progress: JobProgress,
+    error: string | null = null,
+  ) {
     await pool.query(
       `update jobs set status = $2, progress = $3, error = $4, finished_at = now() where id = $1`,
       [id, status, JSON.stringify(progress), error],

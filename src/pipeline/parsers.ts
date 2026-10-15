@@ -6,7 +6,6 @@ import { PDFParse } from "pdf-parse";
 import type { ParsedSection } from "../types.js";
 import type { FileTypeInfo } from "./fileTypes.js";
 
-/** Heuristic: a NUL byte in the first 8 KB means binary content. */
 function looksBinary(buf: Buffer): boolean {
   const len = Math.min(buf.length, 8192);
   for (let i = 0; i < len; i++) if (buf[i] === 0) return true;
@@ -17,9 +16,11 @@ function cellToString(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return "";
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === "object") {
-    if ("richText" in value && Array.isArray(value.richText)) return value.richText.map((r) => r.text).join("");
+    if ("richText" in value && Array.isArray(value.richText))
+      return value.richText.map((r) => r.text).join("");
     if ("text" in value && typeof value.text === "string") return value.text; // hyperlink
-    if ("result" in value) return cellToString(value.result as ExcelJS.CellValue); // formula
+    if ("result" in value)
+      return cellToString(value.result as ExcelJS.CellValue); // formula
     if ("error" in value) return String(value.error);
     return "";
   }
@@ -45,9 +46,14 @@ async function parsePdf(buf: Buffer): Promise<ParsedSection[]> {
   try {
     const result = await parser.getText();
     const sections = result.pages
-      .map((p) => ({ kind: "text" as const, label: `Page ${p.num}`, text: p.text }))
+      .map((p) => ({
+        kind: "text" as const,
+        label: `Page ${p.num}`,
+        text: p.text,
+      }))
       .filter((s) => s.text.trim().length > 0);
-    if (sections.length === 0 && result.text.trim()) return [{ kind: "text", text: result.text }];
+    if (sections.length === 0 && result.text.trim())
+      return [{ kind: "text", text: result.text }];
     return sections;
   } finally {
     await parser.destroy().catch(() => undefined);
@@ -71,23 +77,30 @@ async function parseXlsx(buf: Buffer): Promise<ParsedSection[]> {
 }
 
 function parseCsv(text: string, ext: string): ParsedSection[] {
-  const res = Papa.parse<string[]>(text, { delimiter: ext === "tsv" ? "\t" : "", skipEmptyLines: true });
-  const s = rowsToSection(res.data.map((r) => r.map((c) => String(c ?? "").trim())), "");
+  const res = Papa.parse<string[]>(text, {
+    delimiter: ext === "tsv" ? "\t" : "",
+    skipEmptyLines: true,
+  });
+  const s = rowsToSection(
+    res.data.map((r) => r.map((c) => String(c ?? "").trim())),
+    "",
+  );
   return s ? [{ ...s, label: undefined }] : [];
 }
 
-/**
- * Extract text from a file. Returns logical sections (pages, sheets, or the whole file).
- * Throws on unreadable/corrupt files; the caller records the error per file.
- */
-export async function parseFile(absPath: string, type: FileTypeInfo): Promise<ParsedSection[]> {
+export async function parseFile(
+  absPath: string,
+  type: FileTypeInfo,
+): Promise<ParsedSection[]> {
   const buf = await fs.readFile(absPath);
 
   switch (type.parser) {
     case "text": {
       if (looksBinary(buf)) return [];
       const text = buf.toString("utf8");
-      return text.trim() ? [{ kind: type.kind, language: type.language, text }] : [];
+      return text.trim()
+        ? [{ kind: type.kind, language: type.language, text }]
+        : [];
     }
     case "pdf":
       return parsePdf(buf);

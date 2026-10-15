@@ -19,7 +19,12 @@ router.get("/health", async (_req, res) => {
 
 // Sources (repos and uploads)
 router.post("/sources/git", ingestLimit, sourceController.addGit);
-router.post("/sources/upload", ingestLimit, uploadFiles, sourceController.upload);
+router.post(
+  "/sources/upload",
+  ingestLimit,
+  uploadFiles,
+  sourceController.upload,
+);
 router.post("/sources/:id/sync", ingestLimit, sourceController.sync);
 router.get("/sources", sourceController.list);
 router.get("/sources/:id", sourceController.get);

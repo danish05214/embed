@@ -78,7 +78,10 @@ export const documentRepository = {
   /** Deleting a document cascades to its chunks. */
   async deleteByIds(ids: string[]): Promise<number> {
     if (ids.length === 0) return 0;
-    const res = await pool.query(`delete from documents where id = any($1::uuid[])`, [ids]);
+    const res = await pool.query(
+      `delete from documents where id = any($1::uuid[])`,
+      [ids],
+    );
     return res.rowCount ?? 0;
   },
 };

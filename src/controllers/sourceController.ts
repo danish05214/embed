@@ -27,13 +27,15 @@ const SyncBody = z.object({
 const UploadFields = z.object({
   name: z.string().min(1).max(200).optional(),
   mode: z.enum(["merge", "replace"]).default("merge"),
-  /** Optional JSON array of relative paths, same order as `files` (alternative to file names) */
   paths: z.string().optional(),
 });
 
 const IdParam = z.object({ id: z.string().uuid("id must be a UUID") });
 
-function sendIngest(res: Response, result: IngestResult & { skipped?: unknown }) {
+function sendIngest(
+  res: Response,
+  result: IngestResult & { skipped?: unknown },
+) {
   res.status(result.status === "queued" ? 202 : 200).json(result);
 }
 
@@ -54,15 +56,21 @@ export const sourceController = {
   /** POST /api/sources/upload (multipart/form-data, field `files`) */
   async upload(req: Request, res: Response) {
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-    if (files.length === 0) throw badRequest("No files uploaded. Use multipart field name 'files'.");
+    if (files.length === 0)
+      throw badRequest("No files uploaded. Use multipart field name 'files'.");
     const fields = UploadFields.parse(req.body ?? {});
 
     let paths: string[] | undefined;
     if (fields.paths) {
       try {
-        paths = z.array(z.string().max(1000)).length(files.length).parse(JSON.parse(fields.paths));
+        paths = z
+          .array(z.string().max(1000))
+          .length(files.length)
+          .parse(JSON.parse(fields.paths));
       } catch {
-        throw badRequest("`paths` must be a JSON array of strings with one entry per file");
+        throw badRequest(
+          "`paths` must be a JSON array of strings with one entry per file",
+        );
       }
     }
 

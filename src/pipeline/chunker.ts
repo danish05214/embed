@@ -8,7 +8,10 @@ import { countTokens, truncateToTokens } from "../utils/tokens.js";
 const MAX_EMBED_TOKENS = 8000;
 const MIN_CHUNK_CHARS = 5;
 
-function makeSplitter(kind: ContentKind, language?: string): RecursiveCharacterTextSplitter {
+function makeSplitter(
+  kind: ContentKind,
+  language?: string,
+): RecursiveCharacterTextSplitter {
   const profile = config.chunking.profiles[kind === "table" ? "text" : kind];
   const params = {
     chunkSize: profile.chunkSize,
@@ -17,7 +20,9 @@ function makeSplitter(kind: ContentKind, language?: string): RecursiveCharacterT
   };
   if (language) {
     return RecursiveCharacterTextSplitter.fromLanguage(
-      language as Parameters<typeof RecursiveCharacterTextSplitter.fromLanguage>[0],
+      language as Parameters<
+        typeof RecursiveCharacterTextSplitter.fromLanguage
+      >[0],
       params,
     );
   }
@@ -51,25 +56,23 @@ function chunkTable(section: ParsedSection): string[] {
 /** 1-based line number of a character offset. */
 function lineAt(text: string, offset: number): number {
   let line = 1;
-  for (let i = 0; i < offset && i < text.length; i++) if (text.charCodeAt(i) === 10) line++;
+  for (let i = 0; i < offset && i < text.length; i++)
+    if (text.charCodeAt(i) === 10) line++;
   return line;
 }
 
 function contextHeader(filePath: string, section: ParsedSection): string {
   const parts = [`File: ${filePath}`];
   if (section.label) parts.push(section.label);
-  if (section.language && section.kind === "code") parts.push(`Language: ${section.language}`);
+  if (section.language && section.kind === "code")
+    parts.push(`Language: ${section.language}`);
   return parts.join(" | ");
 }
 
-/**
- * Split parsed sections into chunks with hashes and metadata.
- * - content    : the chunk text (stored, shown to the LLM, returned as citation snippet)
- * - embedText  : short context header + content (what gets embedded)
- * - chunkHash  : hash of normalised content -> detects which parts of a file changed
- * - embedHash  : hash of embedText -> embedding cache key (with model name)
- */
-export async function chunkSections(filePath: string, sections: ParsedSection[]): Promise<ChunkDraft[]> {
+export async function chunkSections(
+  filePath: string,
+  sections: ParsedSection[],
+): Promise<ChunkDraft[]> {
   const drafts: ChunkDraft[] = [];
 
   for (const section of sections) {
@@ -87,7 +90,11 @@ export async function chunkSections(filePath: string, sections: ParsedSection[])
         let pos = source.indexOf(t, cursor);
         if (pos < 0) pos = source.indexOf(t);
         if (pos >= 0) {
-          pieces.push({ text: t, startLine: lineAt(source, pos), endLine: lineAt(source, pos + t.length) });
+          pieces.push({
+            text: t,
+            startLine: lineAt(source, pos),
+            endLine: lineAt(source, pos + t.length),
+          });
           cursor = pos + 1;
         } else {
           pieces.push({ text: t });
@@ -99,7 +106,10 @@ export async function chunkSections(filePath: string, sections: ParsedSection[])
     for (const p of pieces) {
       const content = normalizeText(p.text);
       if (content.length < MIN_CHUNK_CHARS) continue;
-      const embedText = truncateToTokens(`${header}\n\n${content}`, MAX_EMBED_TOKENS);
+      const embedText = truncateToTokens(
+        `${header}\n\n${content}`,
+        MAX_EMBED_TOKENS,
+      );
       drafts.push({
         content,
         embedText,
@@ -111,7 +121,9 @@ export async function chunkSections(filePath: string, sections: ParsedSection[])
           kind: section.kind,
           ...(section.language ? { language: section.language } : {}),
           ...(section.label ? { label: section.label } : {}),
-          ...(p.startLine ? { startLine: p.startLine, endLine: p.endLine } : {}),
+          ...(p.startLine
+            ? { startLine: p.startLine, endLine: p.endLine }
+            : {}),
         },
       });
     }

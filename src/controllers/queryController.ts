@@ -9,7 +9,6 @@ const QueryBody = z.object({
 });
 
 export const queryController = {
-  /** POST /api/query */
   async ask(req: Request, res: Response) {
     const body = QueryBody.parse(req.body);
     res.json(await answerQuestion(body));

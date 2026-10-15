@@ -11,7 +11,9 @@ Rules:
 
 export function formatSourceLabel(hit: SearchHit): string {
   const m = hit.metadata;
-  const lines = m.startLine ? ` (lines ${m.startLine}-${m.endLine ?? m.startLine})` : "";
+  const lines = m.startLine
+    ? ` (lines ${m.startLine}-${m.endLine ?? m.startLine})`
+    : "";
   const label = m.label ? ` - ${m.label}` : "";
   return `${hit.sourceName} : ${hit.path}${label}${lines}`;
 }

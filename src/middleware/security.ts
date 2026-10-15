@@ -1,11 +1,9 @@
 import type { RequestHandler } from "express";
 
-/**
- * Very small fixed-window rate limiter per client IP (in memory).
- * Protects the Azure OpenAI quota from accidental floods. For multiple instances,
- * use a shared store (e.g. Redis) or an API gateway instead.
- */
-export function rateLimit(opts: { windowMs: number; max: number }): RequestHandler {
+export function rateLimit(opts: {
+  windowMs: number;
+  max: number;
+}): RequestHandler {
   const hits = new Map<string, { count: number; resetAt: number }>();
   return (req, res, next) => {
     const key = req.ip ?? "unknown";
@@ -21,7 +19,14 @@ export function rateLimit(opts: { windowMs: number; max: number }): RequestHandl
     entry.count++;
     if (entry.count > opts.max) {
       res.setHeader("Retry-After", Math.ceil((entry.resetAt - now) / 1000));
-      res.status(429).json({ error: { code: "rate_limited", message: "Too many requests, slow down" } });
+      res
+        .status(429)
+        .json({
+          error: {
+            code: "rate_limited",
+            message: "Too many requests, slow down",
+          },
+        });
       return;
     }
     next();

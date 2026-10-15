@@ -2,7 +2,10 @@ import path from "node:path";
 import { config } from "../config.js";
 import { withTransaction } from "../db.js";
 import { EMBEDDING_MODEL, embedTexts } from "../llm/embeddings.js";
-import { chunkRepository, type ChunkToStore } from "../repository/chunkRepository.js";
+import {
+  chunkRepository,
+  type ChunkToStore,
+} from "../repository/chunkRepository.js";
 import { documentRepository } from "../repository/documentRepository.js";
 import type { ChunkDraft, InputFile, JobProgress } from "../types.js";
 import { hashFile, sha256, stableChunkId } from "../utils/hash.js";
@@ -11,16 +14,11 @@ import { chunkSections } from "./chunker.js";
 import { detectFileType } from "./fileTypes.js";
 import { parseFile } from "./parsers.js";
 
-/** Files are parsed/chunked in groups so embedding calls can be batched across small files. */
 const FILE_GROUP_SIZE = 20;
 
 export interface IndexOptions {
   sourceId: string;
   files: InputFile[];
-  /**
-   * full  : the file list is the complete source (Git checkout / replace upload) -> delete missing files
-   * merge : add/update only, keep files not in this batch
-   */
   mode: "full" | "merge";
   report: (p: Partial<JobProgress>) => Promise<void>;
 }
@@ -34,20 +32,18 @@ interface PreparedFile {
 }
 
 /** Hash of the sorted (path, file hash) list: identical uploads produce the same manifest hash. */
-export function manifestHash(entries: { path: string; fileHash: string }[]): string {
-  const lines = [...entries].sort((a, b) => a.path.localeCompare(b.path)).map((e) => `${e.path}\t${e.fileHash}`);
+export function manifestHash(
+  entries: { path: string; fileHash: string }[],
+): string {
+  const lines = [...entries]
+    .sort((a, b) => a.path.localeCompare(b.path))
+    .map((e) => `${e.path}\t${e.fileHash}`);
   return sha256(lines.join("\n"));
 }
 
-/**
- * Incremental indexing:
- * 1. File hash unchanged (and same chunking version + model) -> skip the file entirely.
- * 2. Changed/new file -> parse + chunk; chunks whose text hash is already in the embedding
- *    cache reuse the stored vector, only new text is sent to the embedding model.
- * 3. Chunks are upserted by stable ID; chunks that no longer exist are deleted.
- * 4. In 'full' mode, documents missing from the new file list are deleted.
- */
-export async function indexFiles(opts: IndexOptions): Promise<{ fileHashes: { path: string; fileHash: string }[] }> {
+export async function indexFiles(
+  opts: IndexOptions,
+): Promise<{ fileHashes: { path: string; fileHash: string }[] }> {
   const { sourceId, files, mode, report } = opts;
   const existing = await documentRepository.listBySource(sourceId);
   const progress: JobProgress = {
@@ -110,10 +106,15 @@ export async function indexFiles(opts: IndexOptions): Promise<{ fileHashes: { pa
     // Embedding cache lookup for the whole group
     const allDrafts = prepared.flatMap((p) => p.drafts);
     const uniqueHashes = [...new Set(allDrafts.map((d) => d.embedHash))];
-    const cached = await chunkRepository.getCachedEmbeddings(uniqueHashes, EMBEDDING_MODEL);
+    const cached = await chunkRepository.getCachedEmbeddings(
+      uniqueHashes,
+      EMBEDDING_MODEL,
+    );
 
     const missing = new Map<string, ChunkDraft>();
-    for (const d of allDrafts) if (!cached.has(d.embedHash) && !missing.has(d.embedHash)) missing.set(d.embedHash, d);
+    for (const d of allDrafts)
+      if (!cached.has(d.embedHash) && !missing.has(d.embedHash))
+        missing.set(d.embedHash, d);
     const missingList = [...missing.values()];
 
     const fresh = new Map<string, number[]>();
@@ -131,7 +132,11 @@ export async function indexFiles(opts: IndexOptions): Promise<{ fileHashes: { pa
     for (const p of prepared) {
       try {
         await withTransaction(async (db) => {
-          const status = p.error ? "failed" : p.drafts.length === 0 ? "empty" : "indexed";
+          const status = p.error
+            ? "failed"
+            : p.drafts.length === 0
+              ? "empty"
+              : "indexed";
           const documentId = await documentRepository.upsert(db, {
             sourceId,
             path: p.file.path,
@@ -155,20 +160,35 @@ export async function indexFiles(opts: IndexOptions): Promise<{ fileHashes: { pa
               embedding: cached.get(d.embedHash) ?? fresh.get(d.embedHash)!,
             };
           });
-          await chunkRepository.replaceForDocument(db, documentId, sourceId, chunks, EMBEDDING_MODEL);
+          await chunkRepository.replaceForDocument(
+            db,
+            documentId,
+            sourceId,
+            chunks,
+            EMBEDDING_MODEL,
+          );
 
           const newCache = p.drafts
             .filter((d) => fresh.has(d.embedHash))
-            .map((d) => ({ embedHash: d.embedHash, embedding: fresh.get(d.embedHash)! }));
+            .map((d) => ({
+              embedHash: d.embedHash,
+              embedding: fresh.get(d.embedHash)!,
+            }));
           await chunkRepository.saveCache(db, newCache, EMBEDDING_MODEL);
         });
         if (p.error) {
           progress.filesFailed++;
-          logger.warn("File could not be parsed", { path: p.file.path, error: p.error });
+          logger.warn("File could not be parsed", {
+            path: p.file.path,
+            error: p.error,
+          });
         }
       } catch (err) {
         progress.filesFailed++;
-        logger.error("Failed to store file", { path: p.file.path, error: (err as Error).message });
+        logger.error("Failed to store file", {
+          path: p.file.path,
+          error: (err as Error).message,
+        });
       }
       progress.filesProcessed++;
     }
@@ -178,7 +198,9 @@ export async function indexFiles(opts: IndexOptions): Promise<{ fileHashes: { pa
   // Step 4: delete documents that disappeared from the source
   if (mode === "full") {
     const incoming = new Set(files.map((f) => f.path));
-    const stale = [...existing.values()].filter((d) => !incoming.has(d.path)).map((d) => d.id);
+    const stale = [...existing.values()]
+      .filter((d) => !incoming.has(d.path))
+      .map((d) => d.id);
     progress.filesDeleted = await documentRepository.deleteByIds(stale);
   }
 
