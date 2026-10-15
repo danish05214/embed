@@ -1,12 +1,3 @@
--- =====================================================================
--- CS Embed -- initial schema for Supabase (Postgres + pgvector)
--- Run once in: Supabase Dashboard > SQL Editor > New query > paste > Run
--- Safe to re-run (uses IF NOT EXISTS / OR REPLACE).
---
--- IMPORTANT: vector(1536) must match EMBEDDING_DIMENSIONS in .env
--- (text-embedding-3-small = 1536, text-embedding-3-large = 3072 or reduced).
--- =====================================================================
-
 -- 1. Extensions --------------------------------------------------------
 create extension if not exists vector with schema extensions;  -- pgvector
 -- gen_random_uuid() is built into Postgres 13+ (Supabase runs 15+), no extra extension needed.
