@@ -3,27 +3,10 @@ import { complete } from "../llm/chat.js";
 import { embedQuery } from "../llm/embeddings.js";
 import { ANSWER_SYSTEM_PROMPT, buildUserPrompt } from "../llm/prompts.js";
 import { chunkRepository } from "../repository/chunkRepository.js";
+import type { QueryResult } from "../schemas/query.js";
 import type { SearchHit } from "../types.js";
 
-export interface QuerySource {
-  ref: number;
-  sourceId: string;
-  sourceName: string;
-  sourceType: string;
-  path: string;
-  label?: string;
-  startLine?: number;
-  endLine?: number;
-  url: string | null;
-  score: number;
-  snippet: string;
-}
-
-export interface QueryResult {
-  answer: string;
-  sources: QuerySource[];
-  usage?: { promptTokens: number; completionTokens: number };
-}
+export type { QueryResult, QuerySource } from "../schemas/query.js";
 
 /** Deep link to the exact file/lines at the indexed commit (GitHub/GitLab); repo URL otherwise. */
 function deepLink(hit: SearchHit): string | null {

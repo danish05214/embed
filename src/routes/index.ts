@@ -1,37 +1,15 @@
-import { Router } from "express";
-import { jobController } from "../controllers/jobController.js";
-import { queryController } from "../controllers/queryController.js";
-import { sourceController } from "../controllers/sourceController.js";
-import { rateLimit } from "../middleware/security.js";
-import { uploadFiles } from "../middleware/upload.js";
-import { pool } from "../db.js";
+import { combineApiRouters } from "./apiRouter.js";
+import { healthRoutes } from "./health.routes.js";
+import { jobRoutes } from "./jobs.routes.js";
+import { queryRoutes } from "./query.routes.js";
+import { sourceRoutes } from "./sources.routes.js";
 
-// Express 5 forwards rejected promises from async handlers to the error handler automatically.
-export const router = Router();
-
-const ingestLimit = rateLimit({ windowMs: 60_000, max: 10 });
-const queryLimit = rateLimit({ windowMs: 60_000, max: 30 });
-
-router.get("/health", async (_req, res) => {
-  await pool.query("select 1");
-  res.json({ status: "ok" });
-});
-
-// Sources (repos and uploads)
-router.post("/sources/git", ingestLimit, sourceController.addGit);
-router.post(
-  "/sources/upload",
-  ingestLimit,
-  uploadFiles,
-  sourceController.upload,
-);
-router.post("/sources/:id/sync", ingestLimit, sourceController.sync);
-router.get("/sources", sourceController.list);
-router.get("/sources/:id", sourceController.get);
-router.delete("/sources/:id", sourceController.remove);
-
-// Jobs
-router.get("/jobs/:id", jobController.get);
-
-// Questions
-router.post("/query", queryLimit, queryController.ask);
+// One file per feature. To add a feature: create `<feature>.routes.ts` with
+// createApiRouter({ prefix, tag }) and add it to this list. It shows up in Swagger automatically.
+// (Express 5 forwards rejected promises from async handlers to the error handler.)
+export const router = combineApiRouters([
+  healthRoutes,
+  sourceRoutes,
+  jobRoutes,
+  queryRoutes,
+]);

@@ -38,7 +38,14 @@ export function manifestHash(
   const lines = [...entries]
     .sort((a, b) => a.path.localeCompare(b.path))
     .map((e) => `${e.path}\t${e.fileHash}`);
-  return sha256(lines.join("\n"));
+  // Include the indexing settings so re-uploading the same files after changing the
+  // embedding model/dimensions or chunking version is not treated as "up_to_date".
+  const settings = [
+    `model=${EMBEDDING_MODEL}`,
+    `dims=${config.azureOpenAI.embeddingDimensions}`,
+    `chunking=${config.chunking.version}`,
+  ];
+  return sha256([...settings, ...lines].join("\n"));
 }
 
 export async function indexFiles(

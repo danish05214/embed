@@ -1,11 +1,14 @@
 import type { RequestHandler } from "express";
 
-export function rateLimit(opts: {
-  windowMs: number;
-  max: number;
-}): RequestHandler {
+type RateLimitOpts = { windowMs: number; max: number };
+
+// Lets the API docs detect rate-limited routes and document the 429 automatically.
+const rateLimitInfo = new WeakMap<RequestHandler, RateLimitOpts>();
+export const getRateLimitInfo = (h: RequestHandler) => rateLimitInfo.get(h);
+
+export function rateLimit(opts: RateLimitOpts): RequestHandler {
   const hits = new Map<string, { count: number; resetAt: number }>();
-  return (req, res, next) => {
+  const handler: RequestHandler = (req, res, next) => {
     const key = req.ip ?? "unknown";
     const now = Date.now();
     const entry = hits.get(key);
@@ -31,6 +34,8 @@ export function rateLimit(opts: {
     }
     next();
   };
+  rateLimitInfo.set(handler, opts);
+  return handler;
 }
 
 /** Prevent API responses (which may contain code/doc snippets) from being cached by browsers/proxies. */

@@ -21,6 +21,8 @@ async function main() {
     logger.info(
       `CS Embed API listening on http://localhost:${config.port}/api`,
     );
+    if (config.apiDocsEnabled)
+      logger.info(`API docs: http://localhost:${config.port}/api/docs`);
   });
 
   const shutdown = (signal: string) => {

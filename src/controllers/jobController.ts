@@ -1,9 +1,7 @@
 import type { Request, Response } from "express";
-import { z } from "zod";
 import { jobRepository } from "../repository/jobRepository.js";
+import { IdParam } from "../schemas/common.js";
 import { notFound } from "../utils/errors.js";
-
-const IdParam = z.object({ id: z.string().uuid("id must be a UUID") });
 
 export const jobController = {
   /** GET /api/jobs/:id */

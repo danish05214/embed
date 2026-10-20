@@ -2,7 +2,7 @@ import path from "node:path";
 import type { SupportedTextSplitterLanguage } from "@langchain/textsplitters";
 import type { ContentKind } from "../types.js";
 
-export type ParserKind = "text" | "pdf" | "docx" | "xlsx" | "csv";
+export type ParserKind = "text" | "pdf" | "docx" | "pptx" | "xlsx" | "csv";
 
 export interface FileTypeInfo {
   ext: string;
@@ -69,6 +69,7 @@ const DOC_TYPES: Record<string, Omit<FileTypeInfo, "ext">> = {
   txt: { parser: "text", kind: "text" },
   pdf: { parser: "pdf", kind: "text" },
   docx: { parser: "docx", kind: "text" },
+  pptx: { parser: "pptx", kind: "text" },
   xlsx: { parser: "xlsx", kind: "table" },
   csv: { parser: "csv", kind: "table" },
   tsv: { parser: "csv", kind: "table" },

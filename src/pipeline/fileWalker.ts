@@ -28,10 +28,11 @@ export function filterFile(
     return { ok: false, reason: "unsupported file type" };
   if (size === 0) return { ok: false, reason: "empty file" };
   const t = detectFileType(relPath)!;
+  // Code/text files: MAX_FILE_KB. Binary documents (pdf, docx, pptx, xlsx): MAX_DOC_FILE_MB.
   const limit =
     t.parser === "text"
       ? config.limits.maxFileBytes
-      : config.limits.maxFileBytes * 10;
+      : config.limits.maxDocFileBytes;
   if (size > limit)
     return {
       ok: false,

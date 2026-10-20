@@ -23,6 +23,9 @@ export async function embedTexts(
     const res = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
       input: idx.map((i) => texts[i]!),
+      // text-embedding-3-* can shorten vectors natively. 3-large returns 3072 by default;
+      // asking for EMBEDDING_DIMENSIONS (1536) keeps it compatible with vector(1536) + the HNSW index.
+      dimensions: config.azureOpenAI.embeddingDimensions,
     });
     for (const item of res.data) {
       const vec = item.embedding as number[];

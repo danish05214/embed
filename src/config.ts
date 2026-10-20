@@ -32,10 +32,16 @@ const EnvSchema = z.object({
   CORS_ORIGIN: csv("http://localhost:5173"),
 
   MAX_UPLOAD_MB: z.coerce.number().positive().default(50),
-  MAX_FILE_KB: z.coerce.number().positive().default(1024),
+  MAX_FILE_KB: z.coerce.number().positive().default(1024), // code / plain-text files
+  MAX_DOC_FILE_MB: z.coerce.number().positive().default(25), // pdf, docx, pptx, xlsx
   MAX_FILES_PER_SOURCE: z.coerce.number().int().positive().default(5000),
   ALLOWED_GIT_HOSTS: csv("github.com,gitlab.com,bitbucket.org,dev.azure.com"),
   QUERY_TOP_K: z.coerce.number().int().positive().max(50).default(8),
+  // Swagger UI at /api/docs. Defaults to on; set ENABLE_API_DOCS=false to hide it (e.g. in production).
+  ENABLE_API_DOCS: z
+    .string()
+    .optional()
+    .transform((v) => (v ?? "true").toLowerCase() !== "false"),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -51,6 +57,7 @@ const env = parsed.data;
 export const config = {
   port: env.PORT,
   corsOrigins: env.CORS_ORIGIN,
+  apiDocsEnabled: env.ENABLE_API_DOCS,
 
   db: {
     url: env.DATABASE_URL,
@@ -69,6 +76,7 @@ export const config = {
   limits: {
     maxUploadBytes: env.MAX_UPLOAD_MB * 1024 * 1024,
     maxFileBytes: env.MAX_FILE_KB * 1024,
+    maxDocFileBytes: env.MAX_DOC_FILE_MB * 1024 * 1024,
     maxFilesPerSource: env.MAX_FILES_PER_SOURCE,
   },
 

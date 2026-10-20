@@ -10,6 +10,7 @@ import {
 import { jobQueue } from "../pipeline/jobQueue.js";
 import { jobRepository } from "../repository/jobRepository.js";
 import { sourceRepository } from "../repository/sourceRepository.js";
+import type { IngestResult, UploadResult } from "../schemas/sources.js";
 import type { InputFile, Job, Source } from "../types.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import {
@@ -19,11 +20,7 @@ import {
 } from "../utils/gitUrl.js";
 import { hashFile } from "../utils/hash.js";
 
-export interface IngestResult {
-  status: "queued" | "already_running" | "up_to_date";
-  source: Source;
-  job: Job | null;
-}
+export type { IngestResult, UploadResult } from "../schemas/sources.js";
 
 function slug(text: string): string {
   return text
@@ -145,7 +142,7 @@ export async function addUpload(input: {
   files: UploadedFile[];
   name?: string;
   mode: "merge" | "replace";
-}): Promise<IngestResult & { skipped: { path: string; reason: string }[] }> {
+}): Promise<UploadResult> {
   const cleanupTemp = () =>
     Promise.all(
       input.files.map((f) =>

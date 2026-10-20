@@ -13,7 +13,11 @@ Node.js + TypeScript service that indexes **Git repositories** and **uploaded do
 
 `999_reset_DANGER.sql` drops everything. Use it only in development.
 
-> `vector(1536)` in the SQL must match `EMBEDDING_DIMENSIONS` (text-embedding-3-small = 1536).
+> `vector(1536)` in the SQL must match `EMBEDDING_DIMENSIONS` (default 1536). The app asks the
+> embedding model for exactly that many dimensions, so `text-embedding-3-large` (natively 3072) is
+> returned at 1536 and works with the existing schema and HNSW index.
+> **Changing the embedding model requires re-indexing:** re-sync each Git source and re-upload
+> each document collection (same `name`). Vectors from different models must not be mixed.
 
 ## 2. Configure
 
@@ -26,6 +30,8 @@ Copy `.env.example` to `.env` (a `.env` is already provided) and check:
 | `AZURE_OPENAI_ENDPOINT` | v1 base URL: `https://<resource>.openai.azure.com/openai/v1` |
 | `AZURE_OPENAI_*_DEPLOYMENT` | Deployment names (not model names) |
 | `CORS_ORIGIN` | Your React dev URL(s), comma-separated |
+| `MAX_FILE_KB` | Max size per code/text file (default 1024 KB) |
+| `MAX_DOC_FILE_MB` | Max size per PDF/DOCX/PPTX/XLSX (default 25 MB). Keep ≤ `MAX_UPLOAD_MB` |
 
 ## 3. Run
 
@@ -38,6 +44,20 @@ npm run build && npm start   # production
 ```
 
 API base: `http://localhost:4000/api`
+
+**Swagger UI:** `http://localhost:4000/api/docs` (raw OpenAPI JSON: `/api/docs.json`).
+Set `ENABLE_API_DOCS=false` to turn it off (recommended in production).
+
+Docs are generated automatically with `zod-to-openapi`:
+
+- **Routes:** one file per feature in `src/routes/` (`sources.routes.ts`, `jobs.routes.ts`, ...).
+  Each uses `createApiRouter({ prefix, tag })`, and every `.get/.post/.delete(path, docs, ...handlers)`
+  registers the route in Express **and** in Swagger. The raw Express router is not exposed, so a
+  route can't be added without docs. New feature → new `*.routes.ts` file + add it to `routes/index.ts`.
+- **Schemas:** `src/schemas/` holds the zod schemas. Requests use them for validation; response
+  TypeScript types (`Source`, `Job`, `QueryResult`, ...) are `z.infer`-ed from them. One definition
+  drives validation, types and Swagger.
+- **Prefix:** `API_PREFIX` in `src/app.ts` (`/api`) is used for both the real routes and the docs.
 
 ## 4. API (for the React app)
 

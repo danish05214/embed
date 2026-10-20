@@ -1,48 +1,10 @@
-export type SourceType = "git" | "upload";
-export type SourceStatus = "pending" | "indexing" | "ready" | "failed";
-export type JobStatus = "queued" | "running" | "succeeded" | "failed";
+// API types are inferred from the zod schemas in src/schemas (one definition for
+// validation, TypeScript and Swagger). Re-exported here so existing imports keep working.
+export type { Job, JobProgress, JobStatus } from "./schemas/jobs.js";
+export type { Source, SourceStatus, SourceType } from "./schemas/sources.js";
+import type { SourceType } from "./schemas/sources.js";
+
 export type ContentKind = "code" | "markdown" | "text" | "table";
-
-export interface Source {
-  id: string;
-  sourceKey: string;
-  type: SourceType;
-  name: string;
-  repoUrl: string | null;
-  branch: string | null;
-  lastCommitSha: string | null;
-  manifestHash: string | null;
-  status: SourceStatus;
-  error: string | null;
-  fileCount: number;
-  chunkCount: number;
-  lastIndexedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface JobProgress {
-  filesTotal: number;
-  filesProcessed: number;
-  filesSkipped: number;
-  filesDeleted: number;
-  filesFailed: number;
-  chunksEmbedded: number;
-  chunksReused: number;
-  message?: string;
-}
-
-export interface Job {
-  id: string;
-  sourceId: string;
-  kind: "git_sync" | "upload";
-  status: JobStatus;
-  progress: JobProgress;
-  error: string | null;
-  createdAt: string;
-  startedAt: string | null;
-  finishedAt: string | null;
-}
 
 export interface InputFile {
   path: string;
