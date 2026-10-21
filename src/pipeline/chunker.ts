@@ -4,7 +4,6 @@ import type { ChunkDraft, ContentKind, ParsedSection } from "../types.js";
 import { normalizeText, sha256 } from "../utils/hash.js";
 import { countTokens, truncateToTokens } from "../utils/tokens.js";
 
-/** text-embedding-3 accepts 8,191 tokens; keep headroom for the context header. */
 const MAX_EMBED_TOKENS = 8000;
 const MIN_CHUNK_CHARS = 5;
 

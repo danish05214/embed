@@ -13,12 +13,20 @@ import {
 } from "../schemas/sources.js";
 import { createApiRouter } from "./apiRouter.js";
 
-export const sourceRoutes = createApiRouter({ prefix: "/sources", tag: "Sources" });
+export const sourceRoutes = createApiRouter({
+  prefix: "/sources",
+  tag: "Sources",
+});
 
 const ingestLimit = rateLimit({ windowMs: 60_000, max: 10 });
 
-const ingestResponses = (schema: typeof IngestResult | typeof UploadResult) => ({
-  200: { description: "Already up to date, or a job is already running", schema },
+const ingestResponses = (
+  schema: typeof IngestResult | typeof UploadResult,
+) => ({
+  200: {
+    description: "Already up to date, or a job is already running",
+    schema,
+  },
   202: { description: "Indexing job queued. Poll GET /jobs/{job.id}", schema },
 });
 

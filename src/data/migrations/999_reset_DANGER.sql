@@ -1,6 +1,3 @@
--- DANGER: deletes ALL indexed data and the schema. Use only in development.
--- After running, run 001_init.sql again.
-
 drop function if exists public.hybrid_search(extensions.vector, text, integer, uuid[], integer);
 drop table if exists public.jobs cascade;
 drop table if exists public.chunks cascade;

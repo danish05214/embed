@@ -2,9 +2,11 @@ import { pool } from "../db.js";
 import { HealthResponse } from "../schemas/common.js";
 import { createApiRouter } from "./apiRouter.js";
 
-export const healthRoutes = createApiRouter({ prefix: "/health", tag: "Health" });
+export const healthRoutes = createApiRouter({
+  prefix: "/health",
+  tag: "Health",
+});
 
-// GET /api/health
 healthRoutes.get(
   "/",
   {

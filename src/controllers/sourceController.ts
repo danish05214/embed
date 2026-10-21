@@ -67,12 +67,10 @@ export const sourceController = {
     sendIngest(res, result);
   },
 
-  /** GET /api/sources */
   async list(_req: Request, res: Response) {
     res.json({ sources: await listSources() });
   },
 
-  /** GET /api/sources/:id */
   async get(req: Request, res: Response) {
     const { id } = IdParam.parse(req.params);
     res.json(await getSource(id));

@@ -103,7 +103,10 @@ const XML_ENTITIES: Record<string, string> = {
 function decodeXml(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) => {
     if (e[0] === "#") {
-      const code = e[1]?.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      const code =
+        e[1]?.toLowerCase() === "x"
+          ? parseInt(e.slice(2), 16)
+          : parseInt(e.slice(1), 10);
       return Number.isFinite(code) ? String.fromCodePoint(code) : m;
     }
     return XML_ENTITIES[e.toLowerCase()] ?? m;
@@ -127,7 +130,9 @@ function pptxXmlToText(xml: string, dropFields = false): string {
 
 /** Resolve a relationship target (e.g. "../notesSlides/notesSlide3.xml") relative to a part's folder. */
 function resolvePart(baseDir: string, target: string): string {
-  const parts = (target.startsWith("/") ? target.slice(1) : `${baseDir}/${target}`).split("/");
+  const parts = (
+    target.startsWith("/") ? target.slice(1) : `${baseDir}/${target}`
+  ).split("/");
   const out: string[] = [];
   for (const p of parts) {
     if (p === "..") out.pop();
@@ -136,7 +141,9 @@ function resolvePart(baseDir: string, target: string): string {
   return out.join("/");
 }
 
-function parseRels(xml: string | undefined): Map<string, { type: string; target: string }> {
+function parseRels(
+  xml: string | undefined,
+): Map<string, { type: string; target: string }> {
   const rels = new Map<string, { type: string; target: string }>();
   for (const m of (xml ?? "").matchAll(/<Relationship\b[^>]*>/g)) {
     const tag = m[0];
@@ -156,14 +163,19 @@ async function parsePptx(buf: Buffer): Promise<ParsedSection[]> {
   let slidePaths: string[] = [];
   const presXml = await read("ppt/presentation.xml");
   const presRels = parseRels(await read("ppt/_rels/presentation.xml.rels"));
-  for (const m of (presXml ?? "").matchAll(/<p:sldId\b[^>]*\br:id="([^"]+)"/g)) {
+  for (const m of (presXml ?? "").matchAll(
+    /<p:sldId\b[^>]*\br:id="([^"]+)"/g,
+  )) {
     const rel = presRels.get(m[1]!);
     if (rel) slidePaths.push(resolvePart("ppt", rel.target));
   }
   if (slidePaths.length === 0) {
     slidePaths = Object.keys(zip.files)
       .filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p))
-      .sort((a, b) => Number(/(\d+)\.xml$/.exec(a)![1]) - Number(/(\d+)\.xml$/.exec(b)![1]));
+      .sort(
+        (a, b) =>
+          Number(/(\d+)\.xml$/.exec(a)![1]) - Number(/(\d+)\.xml$/.exec(b)![1]),
+      );
   }
 
   const sections: ParsedSection[] = [];
@@ -183,7 +195,8 @@ async function parsePptx(buf: Buffer): Promise<ParsedSection[]> {
       if (notes) text += `${text ? "\n\n" : ""}Speaker notes:\n${notes}`;
     }
 
-    if (text.trim()) sections.push({ kind: "text", label: `Slide ${i + 1}`, text });
+    if (text.trim())
+      sections.push({ kind: "text", label: `Slide ${i + 1}`, text });
   }
   return sections;
 }

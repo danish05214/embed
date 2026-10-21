@@ -13,7 +13,9 @@ queryRoutes.post(
   {
     summary: "Ask a question over indexed sources",
     body: QueryBody,
-    responses: { 200: { description: "Answer with cited sources", schema: QueryResult } },
+    responses: {
+      200: { description: "Answer with cited sources", schema: QueryResult },
+    },
   },
   queryLimit,
   queryController.ask,

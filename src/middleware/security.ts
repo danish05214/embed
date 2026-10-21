@@ -2,7 +2,6 @@ import type { RequestHandler } from "express";
 
 type RateLimitOpts = { windowMs: number; max: number };
 
-// Lets the API docs detect rate-limited routes and document the 429 automatically.
 const rateLimitInfo = new WeakMap<RequestHandler, RateLimitOpts>();
 export const getRateLimitInfo = (h: RequestHandler) => rateLimitInfo.get(h);
 
@@ -22,14 +21,12 @@ export function rateLimit(opts: RateLimitOpts): RequestHandler {
     entry.count++;
     if (entry.count > opts.max) {
       res.setHeader("Retry-After", Math.ceil((entry.resetAt - now) / 1000));
-      res
-        .status(429)
-        .json({
-          error: {
-            code: "rate_limited",
-            message: "Too many requests, slow down",
-          },
-        });
+      res.status(429).json({
+        error: {
+          code: "rate_limited",
+          message: "Too many requests, slow down",
+        },
+      });
       return;
     }
     next();

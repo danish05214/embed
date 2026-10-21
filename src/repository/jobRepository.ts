@@ -82,7 +82,6 @@ export const jobRepository = {
     );
   },
 
-  /** Jobs left running after a crash/restart can never finish; mark them failed. */
   async failInterrupted(): Promise<number> {
     const res = await pool.query(
       `update jobs set status = 'failed', error = 'Interrupted by server restart', finished_at = now()
