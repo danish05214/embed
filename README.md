@@ -8,7 +8,9 @@ Node.js + TypeScript service that indexes **Git repositories** and **uploaded do
 
 1. Supabase Dashboard → **SQL Editor** → **New query**.
 2. Paste the whole of `src/data/migrations/001_init.sql` → **Run**.
-3. (Optional) Run `src/data/migrations/002_verify.sql`. You should see `vector`, 5 tables with
+3. Paste the whole of `src/data/migrations/003_branch_dedup.sql` → **Run** (multi-branch de-duplication;
+   existing data is migrated in place and duplicates across branches are merged; take a backup first).
+4. (Optional) Run `src/data/migrations/002_verify.sql`. You should see `vector`, 6 tables with
    `rowsecurity = true`, the `hybrid_search` function, and the chunk indexes.
 
 `999_reset_DANGER.sql` drops everything. Use it only in development.
@@ -32,6 +34,34 @@ Copy `.env.example` to `.env` (a `.env` is already provided) and check:
 | `CORS_ORIGIN` | Your React dev URL(s), comma-separated |
 | `MAX_FILE_KB` | Max size per code/text file (default 1024 KB) |
 | `MAX_DOC_FILE_MB` | Max size per PDF/DOCX/PPTX/XLSX (default 25 MB). Keep ≤ `MAX_UPLOAD_MB` |
+
+### Re-ranking (optional, on by default)
+
+After hybrid search, a local cross-encoder (**BGE Reranker v2-m3**, Apache 2.0, run with
+`@huggingface/transformers` on the CPU) re-scores the top `RERANK_CANDIDATES` chunks against the
+question and keeps the best `QUERY_TOP_K`. Free, and no text leaves the server.
+
+```bash
+npm install @huggingface/transformers@4.3.1
+```
+
+- First start downloads the model once (~570 MB for `q8`) from huggingface.co into
+  `<user home>/.cache/cs-embed/models`. Until it is ready, and if it fails or times out, queries use
+  the normal search order (`reranked: false` in the response). Watch for `Re-ranker ready` in the log.
+- Offline/locked-down servers: download once on a machine with access, copy the cache folder, set
+  `RERANK_CACHE_DIR` to it and `RERANK_ALLOW_DOWNLOAD=false`.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `RERANK_ENABLED` | `true` | `false` turns re-ranking off |
+| `RERANK_CANDIDATES` | `30` | Chunks fetched from search and re-scored (more = better recall, slower) |
+| `RERANK_MIN_SCORE` | `0` | Drop chunks below this relevance (0..1), e.g. `0.2` |
+| `RERANK_DTYPE` | `q8` | `q8` fastest on CPU; `fp32` (~2.3 GB) slightly more accurate |
+| `RERANK_MAX_TOKENS` | `1024` | Max tokens per question+chunk pair |
+| `RERANK_BATCH_SIZE` | `8` | Pairs scored per model call |
+| `RERANK_TIMEOUT_MS` | `20000` | Fall back to search order if slower |
+| `RERANK_MODEL` / `RERANK_MODEL_REVISION` | BGE v2-m3 ONNX, pinned commit | Pinned so the downloaded model cannot change |
+| `RERANK_CACHE_DIR` / `RERANK_ALLOW_DOWNLOAD` | home cache / `true` | See above |
 
 ## 3. Run
 
@@ -64,7 +94,9 @@ Docs are generated automatically with `zod-to-openapi`:
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | Server + DB check |
-| POST | `/api/sources/git` | Index a Git repo |
+| POST | `/api/sources/git` | Index a Git repo (one branch) |
+| POST | `/api/sources/git/remote-branches` | List a repo's branches (to pick which to index) |
+| POST | `/api/sources/git/branches` | Index several chosen branches |
 | POST | `/api/sources/upload` | Upload files or a folder (multipart) |
 | POST | `/api/sources/:id/sync` | Re-sync a Git repo (only changed files) |
 | GET | `/api/sources` | List indexed sources |
@@ -85,6 +117,30 @@ POST /api/sources/git
 - Same commit already indexed → `200 { status: "up_to_date" }`. Already indexing → `already_running`.
 - The **token is never stored** or logged; it is used in memory for that request/job only.
   Re-sync of a private repo therefore needs the token again.
+
+### Index several branches
+
+Only the default branch is indexed unless you choose more. To pick branches:
+
+```http
+POST /api/sources/git/remote-branches
+{ "repoUrl": "https://github.com/org/repo", "token": "optional" }
+```
+
+Returns every remote branch with `isDefault`, `sourceId` (if already indexed) and `upToDate`.
+Then index the ones you want:
+
+```http
+POST /api/sources/git/branches
+{ "repoUrl": "https://github.com/org/repo", "branches": ["main", "dev"], "token": "optional" }
+```
+
+- Up to 25 branches per request. All names are checked first; nothing is queued if one is missing.
+- Response `{ results: [IngestResult, ...] }`, one per branch (`202` if any job was queued).
+- Each branch is still its own source (`git:<host>/<repo>@<branch>`), so sync/delete work per branch.
+- **Files identical across branches are stored and embedded once** and tagged with every branch.
+  Search returns such a passage once, with `branches: ["dev", "main"]`. Files that differ get one
+  version per branch. To search one branch only, pass its source ID in `sourceIds`.
 
 ### Upload files / a folder
 
@@ -139,12 +195,16 @@ Git repo / upload ─► filter (ignore rules, secrets, size) ─► file hash c
                                                                │ no
                                                                ▼
                               Azure OpenAI embeddings (batched) ─► upsert by stable chunk ID
-Question ─► embed ─► hybrid search (vector + full-text, RRF) ─► gpt-4.1 answer with citations
+Question ─► embed ─► hybrid search (vector + full-text, RRF) ─► top 30 candidates
+         ─► re-rank (BGE cross-encoder, local) ─► best 8 ─► gpt-4.1 answer with citations
 ```
 
 **Duplicate handling**
 
 - Repo: `git:<host>/<owner>/<repo>@<branch>` key + latest commit SHA (`git ls-remote`, no clone).
+- Branches: documents are shared per repository (`scope_key`). A file version (path + file hash)
+  already indexed for another branch is just linked in `source_documents`: no parsing, embedding
+  or new chunk rows. Versions no branch uses any more are deleted after each sync or delete.
 - Upload: collection name, or a manifest hash of all file hashes when no name is given.
 - File: SHA-256 of the file → unchanged files are skipped.
 - Chunk: SHA-256 of the text → only new/changed chunks are embedded (embedding cache).

@@ -8,6 +8,10 @@ export const JobProgressSchema = z
     filesTotal: z.number().int(),
     filesProcessed: z.number().int(),
     filesSkipped: z.number().int(),
+    filesShared: z
+      .number()
+      .int()
+      .meta({ description: "Unchanged copies of files already indexed for another branch (reused, not re-embedded)" }),
     filesDeleted: z.number().int(),
     filesFailed: z.number().int(),
     chunksEmbedded: z.number().int(),

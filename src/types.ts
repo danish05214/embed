@@ -49,4 +49,8 @@ export interface SearchHit {
   content: string;
   metadata: ChunkDraft["metadata"];
   score: number;
+  /** Every branch (within the searched sources) that contains this exact chunk. */
+  branches: string[];
+  /** Source IDs matching `branches` (same order). `sourceId` is the representative one. */
+  sourceIds: string[];
 }

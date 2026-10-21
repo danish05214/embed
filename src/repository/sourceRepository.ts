@@ -1,13 +1,14 @@
 import { pool, type Queryable } from "../db.js";
 import type { Source, SourceStatus, SourceType } from "../types.js";
 
-const COLUMNS = `id, source_key, type, name, repo_url, branch, last_commit_sha, manifest_hash, status, error,
+const COLUMNS = `id, source_key, scope_key, type, name, repo_url, branch, last_commit_sha, manifest_hash, status, error,
   file_count, chunk_count, last_indexed_at, created_at, updated_at`;
 
 function map(r: Record<string, unknown>): Source {
   return {
     id: r.id as string,
     sourceKey: r.source_key as string,
+    scopeKey: r.scope_key as string,
     type: r.type as SourceType,
     name: r.name as string,
     repoUrl: (r.repo_url as string) ?? null,
@@ -53,21 +54,32 @@ export const sourceRepository = {
     return rows.map(map);
   },
 
+  /** All sources sharing a scope, e.g. every indexed branch of one repository. */
+  async listByScope(scopeKey: string): Promise<Source[]> {
+    const { rows } = await pool.query(
+      `select ${COLUMNS} from sources where scope_key = $1 order by branch`,
+      [scopeKey],
+    );
+    return rows.map(map);
+  },
+
   /** Insert, or return the existing row for the same key (no duplicates). */
   async findOrCreate(input: {
     sourceKey: string;
+    scopeKey: string;
     type: SourceType;
     name: string;
     repoUrl?: string | null;
     branch?: string | null;
   }): Promise<{ source: Source; created: boolean }> {
     const { rows } = await pool.query(
-      `insert into sources (source_key, type, name, repo_url, branch)
-       values ($1, $2, $3, $4, $5)
+      `insert into sources (source_key, scope_key, type, name, repo_url, branch)
+       values ($1, $2, $3, $4, $5, $6)
        on conflict (source_key) do nothing
        returning ${COLUMNS}`,
       [
         input.sourceKey,
+        input.scopeKey,
         input.type,
         input.name,
         input.repoUrl ?? null,
@@ -101,8 +113,10 @@ export const sourceRepository = {
          error = null,
          last_commit_sha = coalesce($2, s.last_commit_sha),
          manifest_hash = coalesce($3, s.manifest_hash),
-         file_count = (select count(*) from documents d where d.source_id = s.id),
-         chunk_count = (select count(*) from chunks c where c.source_id = s.id),
+         file_count = (select count(*) from source_documents sd where sd.source_id = s.id),
+         chunk_count = (select count(*) from source_documents sd
+                          join chunks c on c.document_id = sd.document_id
+                         where sd.source_id = s.id),
          last_indexed_at = now()
        where s.id = $1`,
       [id, data.lastCommitSha ?? null, data.manifestHash ?? null],

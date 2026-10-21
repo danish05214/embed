@@ -68,8 +68,13 @@ export function parseRepoUrl(
   return { cloneUrl, host, path: path.toLowerCase() };
 }
 
+/** One key per repository: all its branches share identical files under this scope. */
+export function gitScopeKey(parsed: ParsedRepoUrl): string {
+  return `git:${parsed.host}/${parsed.path}`;
+}
+
 export function gitSourceKey(parsed: ParsedRepoUrl, branch: string): string {
-  return `git:${parsed.host}/${parsed.path}@${branch}`;
+  return `${gitScopeKey(parsed)}@${branch}`;
 }
 
 export function isValidBranchName(branch: string): boolean {

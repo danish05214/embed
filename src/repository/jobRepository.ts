@@ -5,6 +5,7 @@ export const emptyProgress = (): JobProgress => ({
   filesTotal: 0,
   filesProcessed: 0,
   filesSkipped: 0,
+  filesShared: 0,
   filesDeleted: 0,
   filesFailed: 0,
   chunksEmbedded: 0,

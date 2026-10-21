@@ -1,26 +1,46 @@
 import fs from "node:fs/promises";
 import { config } from "../config.js";
 import { manifestHash, indexFiles } from "../pipeline/indexer.js";
-import { cloneShallow, getRemoteHead } from "../pipeline/gitFetcher.js";
+import {
+  cloneShallow,
+  getRemoteHead,
+  listRemoteBranches,
+} from "../pipeline/gitFetcher.js";
 import {
   filterFile,
   sanitizeRelativePath,
   walkDirectory,
 } from "../pipeline/fileWalker.js";
 import { jobQueue } from "../pipeline/jobQueue.js";
+import { documentRepository } from "../repository/documentRepository.js";
 import { jobRepository } from "../repository/jobRepository.js";
 import { sourceRepository } from "../repository/sourceRepository.js";
-import type { IngestResult, UploadResult } from "../schemas/sources.js";
+import type {
+  IngestResult,
+  MultiIngestResult,
+  RemoteBranchList,
+  UploadResult,
+} from "../schemas/sources.js";
 import type { InputFile, Job, Source } from "../types.js";
-import { badRequest, notFound } from "../utils/errors.js";
+import { AppError, badRequest, notFound } from "../utils/errors.js";
 import {
+  gitScopeKey,
   gitSourceKey,
   isValidBranchName,
   parseRepoUrl,
 } from "../utils/gitUrl.js";
 import { hashFile } from "../utils/hash.js";
+import { logger } from "../utils/logger.js";
 
-export type { IngestResult, UploadResult } from "../schemas/sources.js";
+export type {
+  IngestResult,
+  MultiIngestResult,
+  RemoteBranchList,
+  UploadResult,
+} from "../schemas/sources.js";
+
+/** Max branches returned by the branch list (very large repos can have thousands). */
+const MAX_LISTED_BRANCHES = 1000;
 
 function slug(text: string): string {
   return text
@@ -49,8 +69,11 @@ export async function addGitSource(input: {
   );
   const sourceKey = gitSourceKey(parsed, head.branch);
 
+  const scopeKey = gitScopeKey(parsed);
+
   const { source } = await sourceRepository.findOrCreate({
     sourceKey,
+    scopeKey,
     type: "git",
     name: input.name?.trim() || `${parsed.path}@${head.branch}`,
     repoUrl: parsed.cloneUrl,
@@ -89,7 +112,13 @@ export async function addGitSource(input: {
       );
       cleanup = clone.cleanup;
       const { files } = await walkDirectory(clone.dir);
-      await indexFiles({ sourceId: source.id, files, mode: "full", report });
+      await indexFiles({
+        sourceId: source.id,
+        scopeKey: source.scopeKey,
+        files,
+        mode: "full",
+        report,
+      });
       await sourceRepository.markIndexed(source.id, {
         lastCommitSha: clone.sha,
       });
@@ -110,6 +139,83 @@ export async function addGitSource(input: {
     source: (await sourceRepository.findById(source.id))!,
     job,
   };
+}
+
+/** Branches on the remote, the default branch, and which of them are already indexed. */
+export async function listGitBranches(input: {
+  repoUrl: string;
+  token?: string;
+}): Promise<RemoteBranchList> {
+  const parsed = parseRepoUrl(input.repoUrl, config.git.allowedHosts);
+  const [head, remote, indexed] = await Promise.all([
+    getRemoteHead(parsed.cloneUrl, parsed.host, undefined, input.token),
+    listRemoteBranches(parsed.cloneUrl, parsed.host, input.token),
+    sourceRepository.listByScope(gitScopeKey(parsed)),
+  ]);
+  const byBranch = new Map(indexed.map((s) => [s.branch, s]));
+  return {
+    repoUrl: parsed.cloneUrl,
+    defaultBranch: head.branch,
+    total: remote.length,
+    truncated: remote.length > MAX_LISTED_BRANCHES,
+    branches: remote.slice(0, MAX_LISTED_BRANCHES).map((b) => {
+      const s = byBranch.get(b.name);
+      return {
+        name: b.name,
+        sha: b.sha,
+        isDefault: b.name === head.branch,
+        sourceId: s?.id ?? null,
+        status: s?.status ?? null,
+        upToDate: s ? s.status === "ready" && s.lastCommitSha === b.sha : false,
+      };
+    }),
+  };
+}
+
+/**
+ * Index several chosen branches of one repo. Each branch becomes its own source; files that
+ * are identical across branches are stored and embedded once and tagged with every branch.
+ * Jobs run one after another, so later branches reuse what earlier ones indexed.
+ */
+export async function addGitBranches(input: {
+  repoUrl: string;
+  branches: string[];
+  token?: string;
+  force?: boolean;
+}): Promise<MultiIngestResult> {
+  const parsed = parseRepoUrl(input.repoUrl, config.git.allowedHosts);
+  const branches = [...new Set(input.branches.map((b) => b.trim()))];
+  const invalid = branches.filter((b) => !isValidBranchName(b));
+  if (invalid.length)
+    throw badRequest("Invalid branch name(s)", { branches: invalid });
+
+  // Check every branch exists before queueing anything (all-or-nothing request).
+  const remote = new Set(
+    (await listRemoteBranches(parsed.cloneUrl, parsed.host, input.token)).map(
+      (b) => b.name,
+    ),
+  );
+  const missing = branches.filter((b) => !remote.has(b));
+  if (missing.length)
+    throw new AppError(
+      422,
+      "branch_not_found",
+      `Branch(es) not found in repository: ${missing.join(", ")}`,
+      { branches: missing },
+    );
+
+  const results: IngestResult[] = [];
+  for (const branch of branches) {
+    results.push(
+      await addGitSource({
+        repoUrl: input.repoUrl,
+        branch,
+        token: input.token,
+        force: input.force,
+      }),
+    );
+  }
+  return { results };
 }
 
 export async function resyncGitSource(
@@ -194,6 +300,7 @@ export async function addUpload(input: {
 
     const { source } = await sourceRepository.findOrCreate({
       sourceKey,
+      scopeKey: sourceKey, // an upload collection only shares files with itself
       type: "upload",
       name:
         name ||
@@ -225,6 +332,7 @@ export async function addUpload(input: {
       try {
         await indexFiles({
           sourceId: source.id,
+          scopeKey: source.scopeKey,
           files: accepted,
           mode: input.mode === "replace" ? "full" : "merge",
           report,
@@ -274,6 +382,17 @@ export async function deleteSource(id: string): Promise<void> {
     throw badRequest(
       "Source is being indexed; try again when the job finishes",
     );
+  const source = await sourceRepository.findById(id);
+  if (!source) throw notFound("Source not found");
   const ok = await sourceRepository.delete(id);
   if (!ok) throw notFound("Source not found");
+  // Its branch tags are gone (cascade); delete file versions no other branch uses.
+  try {
+    await documentRepository.deleteOrphans(source.scopeKey);
+  } catch (err) {
+    logger.warn("Orphan clean-up skipped; it will run on the next indexing", {
+      scopeKey: source.scopeKey,
+      error: (err as Error).message,
+    });
+  }
 }

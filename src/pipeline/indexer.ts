@@ -18,6 +18,8 @@ const FILE_GROUP_SIZE = 20;
 
 export interface IndexOptions {
   sourceId: string;
+  /** Files are shared with other sources in the same scope (other branches of the repo). */
+  scopeKey: string;
   files: InputFile[];
   mode: "full" | "merge";
   report: (p: Partial<JobProgress>) => Promise<void>;
@@ -51,12 +53,13 @@ export function manifestHash(
 export async function indexFiles(
   opts: IndexOptions,
 ): Promise<{ fileHashes: { path: string; fileHash: string }[] }> {
-  const { sourceId, files, mode, report } = opts;
+  const { sourceId, scopeKey, files, mode, report } = opts;
   const existing = await documentRepository.listBySource(sourceId);
   const progress: JobProgress = {
     filesTotal: files.length,
     filesProcessed: 0,
     filesSkipped: 0,
+    filesShared: 0,
     filesDeleted: 0,
     filesFailed: 0,
     chunksEmbedded: 0,
@@ -81,6 +84,26 @@ export async function indexFiles(
       prev.status !== "failed";
     if (unchanged) {
       progress.filesSkipped++;
+      progress.filesProcessed++;
+      continue;
+    }
+
+    // Same file version already indexed in this repo (e.g. for another branch)?
+    // Then just tag it with this branch: no parsing, chunking, embedding or new rows.
+    const shared = await withTransaction(async (db) => {
+      const documentId = await documentRepository.findReusable(db, {
+        scopeKey,
+        path: file.path,
+        fileHash,
+        chunkingVersion: config.chunking.version,
+        embeddingModel: EMBEDDING_MODEL,
+      });
+      if (documentId)
+        await documentRepository.link(db, sourceId, file.path, documentId);
+      return documentId !== null;
+    });
+    if (shared) {
+      progress.filesShared++;
       progress.filesProcessed++;
     } else {
       toProcess.push({ file, fileHash });
@@ -145,7 +168,7 @@ export async function indexFiles(
               ? "empty"
               : "indexed";
           const documentId = await documentRepository.upsert(db, {
-            sourceId,
+            scopeKey,
             path: p.file.path,
             fileHash: p.fileHash,
             fileType: p.fileType,
@@ -156,6 +179,7 @@ export async function indexFiles(
             status,
             error: p.error ? p.error.slice(0, 500) : null,
           });
+          await documentRepository.link(db, sourceId, p.file.path, documentId);
 
           const occurrences = new Map<string, number>();
           const chunks: ChunkToStore[] = p.drafts.map((d) => {
@@ -170,7 +194,6 @@ export async function indexFiles(
           await chunkRepository.replaceForDocument(
             db,
             documentId,
-            sourceId,
             chunks,
             EMBEDDING_MODEL,
           );
@@ -202,13 +225,24 @@ export async function indexFiles(
     await report(progress);
   }
 
-  // Step 4: delete documents that disappeared from the source
+  // Step 4: remove files that disappeared from this source (other branches keep their copy)
   if (mode === "full") {
     const incoming = new Set(files.map((f) => f.path));
-    const stale = [...existing.values()]
-      .filter((d) => !incoming.has(d.path))
-      .map((d) => d.id);
-    progress.filesDeleted = await documentRepository.deleteByIds(stale);
+    const stale = [...existing.keys()].filter((p) => !incoming.has(p));
+    progress.filesDeleted = await documentRepository.unlinkPaths(
+      sourceId,
+      stale,
+    );
+  }
+
+  // Step 5: delete file versions no branch uses any more (old versions, removed files)
+  try {
+    await documentRepository.deleteOrphans(scopeKey);
+  } catch (err) {
+    logger.warn("Orphan clean-up skipped; it will run again next time", {
+      scopeKey,
+      error: (err as Error).message,
+    });
   }
 
   progress.message = "Done";

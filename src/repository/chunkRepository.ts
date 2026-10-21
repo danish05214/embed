@@ -37,10 +37,10 @@ export const chunkRepository = {
     }
   },
 
+  /** Chunks belong to a (shared) document; which branches contain it comes from source_documents. */
   async replaceForDocument(
     db: Queryable,
     documentId: string,
-    sourceId: string,
     chunks: ChunkToStore[],
     model: string,
   ): Promise<void> {
@@ -53,8 +53,8 @@ export const chunkRepository = {
     for (const c of chunks) {
       await db.query(
         `insert into chunks
-           (id, document_id, source_id, chunk_index, chunk_hash, embed_hash, content, metadata, token_count, embedding, embedding_model)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           (id, document_id, chunk_index, chunk_hash, embed_hash, content, metadata, token_count, embedding, embedding_model)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          on conflict (id) do update set
            chunk_index = excluded.chunk_index,
            embed_hash = excluded.embed_hash,
@@ -66,7 +66,6 @@ export const chunkRepository = {
         [
           c.id,
           documentId,
-          sourceId,
           c.index,
           c.chunkHash,
           c.embedHash,
@@ -107,6 +106,8 @@ export const chunkRepository = {
       content: r.content,
       metadata: r.metadata,
       score: Number(r.score),
+      branches: (r.branches as string[] | null) ?? [],
+      sourceIds: (r.source_ids as string[] | null) ?? [],
     }));
   },
 };

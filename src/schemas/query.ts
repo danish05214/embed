@@ -22,12 +22,19 @@ export const QuerySourceSchema = z
     sourceId: z.string().uuid(),
     sourceName: z.string(),
     sourceType: z.string(),
+    branches: z
+      .array(z.string())
+      .meta({ description: "Every searched branch containing this exact passage (empty for uploads)", example: ["dev", "main"] }),
     path: z.string(),
     label: z.string().optional(),
     startLine: z.number().int().optional(),
     endLine: z.number().int().optional(),
     url: z.string().nullable().meta({ description: "Deep link to file/lines (GitHub/GitLab)" }),
-    score: z.number(),
+    score: z.number().meta({ description: "Hybrid search score (RRF)" }),
+    rerankScore: z
+      .number()
+      .nullable()
+      .meta({ description: "Re-ranker relevance 0..1 (higher = more relevant); null when not re-ranked" }),
     snippet: z.string(),
   })
   .meta({ id: "QuerySource" });
@@ -39,6 +46,9 @@ export const QueryResult = z
     usage: z
       .object({ promptTokens: z.number().int(), completionTokens: z.number().int() })
       .optional(),
+    reranked: z
+      .boolean()
+      .meta({ description: "true if the sources were re-ordered by the re-ranker; false = search order (re-ranker off, loading or failed)" }),
   })
   .meta({ id: "QueryResult" });
 

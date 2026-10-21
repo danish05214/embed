@@ -72,4 +72,12 @@ export async function checkDatabase(): Promise<void> {
       "Tables are missing. Run src/data/migrations/001_init.sql in the Supabase SQL editor.",
     );
   }
+  const m = await pool.query<{ ok: boolean }>(
+    "select to_regclass('public.source_documents') is not null as ok",
+  );
+  if (!m.rows[0]?.ok) {
+    throw new Error(
+      "Branch de-duplication tables are missing. Run src/data/migrations/003_branch_dedup.sql in the Supabase SQL editor.",
+    );
+  }
 }

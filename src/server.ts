@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { checkDatabase, pool } from "./db.js";
+import { warmUpReranker } from "./llm/reranker.js";
 import { jobRepository } from "./repository/jobRepository.js";
 import { sourceRepository } from "./repository/sourceRepository.js";
 import { logger } from "./utils/logger.js";
@@ -23,6 +24,8 @@ async function main() {
     );
     if (config.apiDocsEnabled)
       logger.info(`API docs: http://localhost:${config.port}/api/docs`);
+    // Load the re-ranker in the background (first run downloads ~570 MB); queries work meanwhile.
+    warmUpReranker();
   });
 
   const shutdown = (signal: string) => {

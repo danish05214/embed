@@ -150,6 +150,34 @@ export async function getRemoteHead(
   }
 }
 
+/** All branches on the remote with their latest commit (`git ls-remote --heads`, no clone). */
+export async function listRemoteBranches(
+  cloneUrl: string,
+  host: string,
+  token?: string,
+): Promise<{ name: string; sha: string }[]> {
+  try {
+    const { stdout } = await run(
+      "git",
+      ["ls-remote", "--heads", "--", cloneUrl],
+      {
+        env: gitEnv(host, token),
+        timeout: 60_000,
+        maxBuffer: 20 * 1024 * 1024,
+      },
+    );
+    const branches: { name: string; sha: string }[] = [];
+    for (const line of stdout.split("\n")) {
+      const m = /^([0-9a-f]{40,64})\s+refs\/heads\/(\S+)$/.exec(line.trim());
+      if (m) branches.push({ sha: m[1]!, name: m[2]! });
+    }
+    return branches.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw toAppError(err);
+  }
+}
+
 /** Shallow-clone a single branch (latest commit only) into a new temp directory. */
 export async function cloneShallow(
   cloneUrl: string,

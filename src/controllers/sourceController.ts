@@ -1,16 +1,24 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {
+  addGitBranches,
   addGitSource,
   addUpload,
   deleteSource,
   getSource,
+  listGitBranches,
   listSources,
   resyncGitSource,
   type IngestResult,
 } from "../services/sourceService.js";
 import { IdParam } from "../schemas/common.js";
-import { GitSourceBody, SyncBody, UploadFields } from "../schemas/sources.js";
+import {
+  GitBranchesBody,
+  GitSourceBody,
+  RemoteBranchesBody,
+  SyncBody,
+  UploadFields,
+} from "../schemas/sources.js";
 import { badRequest } from "../utils/errors.js";
 
 function sendIngest(
@@ -25,6 +33,20 @@ export const sourceController = {
   async addGit(req: Request, res: Response) {
     const body = GitSourceBody.parse(req.body);
     sendIngest(res, await addGitSource(body));
+  },
+
+  /** POST /api/sources/git/remote-branches */
+  async remoteBranches(req: Request, res: Response) {
+    const body = RemoteBranchesBody.parse(req.body);
+    res.json(await listGitBranches(body));
+  },
+
+  /** POST /api/sources/git/branches */
+  async addGitBranches(req: Request, res: Response) {
+    const body = GitBranchesBody.parse(req.body);
+    const result = await addGitBranches(body);
+    const anyQueued = result.results.some((r) => r.status === "queued");
+    res.status(anyQueued ? 202 : 200).json(result);
   },
 
   /** POST /api/sources/:id/sync */
